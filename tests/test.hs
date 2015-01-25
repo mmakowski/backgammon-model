@@ -1,5 +1,6 @@
 import Test.Tasty
 import Test.Tasty.HUnit
+import Control.Applicative
 
 import Backgammon
 
@@ -17,4 +18,10 @@ unitTests = testGroup "Unit tests"
 
   , testCase "initial game state is 'players to throw initial'" $
       gameState newGame @?= PlayersToThrowInitial
+
+  , testCase "when white wins initial throw it is to move with thrown dice" $
+      gameState <$> (performAction (InitialThrows 2 1) newGame) @?= (Right (ToMove White (2, 1)))
+
+  , testCase "when black wins initial throw it is to move with thrown dice" $
+      gameState <$> (performAction (InitialThrows 1 2) newGame) @?= (Right (ToMove Black (2, 1)))
   ]

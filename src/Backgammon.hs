@@ -1,9 +1,11 @@
 module Backgammon
 ( Side (White, Black)
 , Game
+, GameAction (..)
 , GameState (..)
 , newGame
 , gameState
+, performAction
 , pipCount
 )
 where
@@ -26,7 +28,6 @@ data Move = Move Pos Pos
 
 data Game = Game { _gameBoard :: Board
                  , _gameActions :: [GameAction]
-                 , _gameDice :: Dice
                  , _gameDoublingCube :: DoublingCube
                  , gameState :: GameState
                  }
@@ -56,6 +57,7 @@ data PlayerDecision = Moves [Move]
   deriving (Eq, Show)
 
 data GameState = PlayersToThrowInitial
+               | ToMove Side Dice
   deriving (Eq, Show)
 
 data InvalidDecision = InvalidDecision Game PlayerDecision InvalidDecisionType
@@ -65,11 +67,15 @@ data InvalidDecisionType = MustEnterBeforeMoving
                          | MovePossible
   deriving (Eq, Show)
 
+data InvalidAction = ActionInvalidForState GameState GameAction
+                   | InvalidPlayerDecision InvalidDecision
+  deriving (Eq, Show)
+
 newGame :: Game
-newGame = Game initialBoard [] (1,1) initialDoublingCube PlayersToThrowInitial
+newGame = Game initialBoard [] initialDoublingCube PlayersToThrowInitial
 
 initialBoard :: Board
-initialBoard = Board [ Just (Black, 5), Nothing, Nothing, Nothing, Just (White, 3), Nothing , Just (White, 5), Nothing, Nothing, Nothing, Nothing, Just (Black, 2)
+initialBoard = Board [ Just (Black, 2), Nothing, Nothing, Nothing, Nothing, Just (White, 5), Nothing, Just ( White, 3), Nothing, Nothing, Nothing, Just (Black, 5)
                      , Just (White, 5), Nothing, Nothing, Nothing, Just (Black, 3), Nothing , Just (Black, 5), Nothing, Nothing, Nothing, Nothing, Just (White, 2)
                      ]
                      0
@@ -78,12 +84,23 @@ initialBoard = Board [ Just (Black, 5), Nothing, Nothing, Nothing, Just (White, 
 initialDoublingCube :: DoublingCube
 initialDoublingCube = DoublingCube Nothing 1
 
+normDice :: Dice -> Dice
+normDice (d1, d2) = if d1 > d2 then (d1, d2) else (d2, d1)
+
+performAction :: GameAction -> Game -> Either InvalidAction Game
+performAction a@(InitialThrows white black) game =
+  Right $ game { _gameActions = _gameActions game ++ [a]
+               , gameState    = ToMove side (normDice (white, black))
+               }
+  where
+    side = if white > black then White else Black
+
 pipDists :: Side -> [Int]
-pipDists White = reverse [1..12] ++ [13..24]
-pipDists Black = [13..24] ++ reverse [1..12]
+pipDists White = [1..24]
+pipDists Black = reverse [1..24]
 
 pipCount :: Side -> Game -> Int
-pipCount side (Game (Board poss _ _) _ _ _ _) = sum $ zipWith count (pipDists side) poss
+pipCount side (Game (Board poss _ _) _ _ _) = sum $ zipWith count (pipDists side) poss
   where
     count dist (Just (s, n)) | s == side = n * dist
     count _    _                         = 0
