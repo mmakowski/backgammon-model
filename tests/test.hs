@@ -24,4 +24,8 @@ unitTests = testGroup "Unit tests"
 
   , testCase "when black wins initial throw it is to move with thrown dice" $
       gameState <$> (performAction (InitialThrows 1 2) newGame) @?= (Right (ToMove Black (2, 1)))
+
+  , testCase "when initial throw is a tie the state is again 'players to throw initial'" $
+      gameState <$> (performAction (InitialThrows 3 3) newGame) @?= (Right PlayersToThrowInitial)
   ]
+

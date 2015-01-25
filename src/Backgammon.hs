@@ -90,7 +90,8 @@ normDice (d1, d2) = if d1 > d2 then (d1, d2) else (d2, d1)
 performAction :: GameAction -> Game -> Either InvalidAction Game
 performAction a@(InitialThrows white black) game =
   Right $ game { _gameActions = _gameActions game ++ [a]
-               , gameState    = ToMove side (normDice (white, black))
+               , gameState    = if white /= black then ToMove side (normDice (white, black))
+                                else                   PlayersToThrowInitial
                }
   where
     side = if white > black then White else Black
