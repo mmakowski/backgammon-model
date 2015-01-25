@@ -1,4 +1,11 @@
 module Backgammon
+( Side (White, Black)
+, Game
+, GameState (..)
+, newGame
+, gameState
+, pipCount
+)
 where
 
 type Pos = Int
@@ -17,10 +24,15 @@ data Move = Move Pos Pos
           | TakeOff Pos
   deriving (Eq, Show)
 
-data Game = Game Board [GameAction] Dice DoublingCube
+data Game = Game { _gameBoard :: Board
+                 , _gameActions :: [GameAction]
+                 , _gameDice :: Dice
+                 , _gameDoublingCube :: DoublingCube
+                 , gameState :: GameState
+                 }
   deriving (Eq, Show)
 
-data Board = Board [Maybe (Side, Int)]
+data Board = Board [Maybe (Side, Int)] Int Int
   deriving (Eq, Show)
 
 data DoublingCube = DoublingCube (Maybe Side) DoublingCubeValue
@@ -31,7 +43,7 @@ data Result = Normal | Gammon | Backgammon
 
 data GameAction = PlayerAction PlayerDecision
                 | Throw Dice
-                | InitialThrow Side Die
+                | InitialThrows Die Die
   deriving (Eq, Show)
 
 data PlayerDecision = Moves [Move]
@@ -43,6 +55,9 @@ data PlayerDecision = Moves [Move]
                     | RejectResign
   deriving (Eq, Show)
 
+data GameState = PlayersToThrowInitial
+  deriving (Eq, Show)
+
 data InvalidDecision = InvalidDecision Game PlayerDecision InvalidDecisionType
   deriving (Eq, Show)
 
@@ -51,12 +66,14 @@ data InvalidDecisionType = MustEnterBeforeMoving
   deriving (Eq, Show)
 
 newGame :: Game
-newGame = Game initialBoard [] (1,1) initialDoublingCube
+newGame = Game initialBoard [] (1,1) initialDoublingCube PlayersToThrowInitial
 
 initialBoard :: Board
 initialBoard = Board [ Just (Black, 5), Nothing, Nothing, Nothing, Just (White, 3), Nothing , Just (White, 5), Nothing, Nothing, Nothing, Nothing, Just (Black, 2)
                      , Just (White, 5), Nothing, Nothing, Nothing, Just (Black, 3), Nothing , Just (Black, 5), Nothing, Nothing, Nothing, Nothing, Just (White, 2)
                      ]
+                     0
+                     0
 
 initialDoublingCube :: DoublingCube
 initialDoublingCube = DoublingCube Nothing 1
@@ -66,11 +83,12 @@ pipDists White = reverse [1..12] ++ [13..24]
 pipDists Black = [13..24] ++ reverse [1..12]
 
 pipCount :: Side -> Game -> Int
-pipCount side (Game (Board poss) _ _ _) = sum $ zipWith count (pipDists side) poss
+pipCount side (Game (Board poss _ _) _ _ _ _) = sum $ zipWith count (pipDists side) poss
   where
     count dist (Just (s, n)) | s == side = n * dist
     count _    _                         = 0
 
+{-
 perform :: PlayerDecision -> Game -> Either InvalidDecision Game
 perform = error "TODO"
 
@@ -78,5 +96,5 @@ resultMultiplier :: Result -> Int
 resultMultiplier Normal = 1
 resultMultiplier Gammon = 2
 resultMultiplier Backgammon = 3
-
+-}
 

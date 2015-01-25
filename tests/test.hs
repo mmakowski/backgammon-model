@@ -14,4 +14,7 @@ unitTests = testGroup "Unit tests"
 
   , testCase "initial black pip count is 167" $
       pipCount Black newGame @?= 167
+
+  , testCase "initial game state is 'players to throw initial'" $
+      gameState newGame @?= PlayersToThrowInitial
   ]
