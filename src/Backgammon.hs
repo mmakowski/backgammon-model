@@ -125,7 +125,7 @@ performAction a@(PlayerAction (Moves moves)) game =
     updatedBoard = foldM move (gameBoard game) moves
 
 performActions :: [GameAction] -> Game -> Either InvalidAction Game
-performActions actions game = foldl' (\eg a -> eg >>= performAction a) (Right game) actions
+performActions actions game = foldl' (\eg a -> eg >>= performAction a) (Right game) actions -- TODO: use foldM?
 
 parseBoard :: String -> Maybe Board
 parseBoard = error "TODO: parse"
