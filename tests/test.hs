@@ -1,6 +1,7 @@
 import Test.Tasty
 import Test.Tasty.HUnit
-import Control.Applicative
+import Control.Applicative ((<$>))
+import Data.Maybe (fromJust)
 
 import Backgammon
 
@@ -27,5 +28,13 @@ unitTests = testGroup "Unit tests"
 
   , testCase "when initial throw is a tie the state is again 'players to throw initial'" $
       gameState <$> (performAction (InitialThrows 3 3) newGame) @?= (Right PlayersToThrowInitial)
+
+  -- TODO: all other cases: error
+
+  , testCase "board is updated after move" $
+      gameBoard <$> (performActions [ (InitialThrows 3 1)
+                                    , (PlayerAction (Moves [Move 8 5, Move 6 5]))] newGame) @?=
+      (Right (fromJust (parseBoard "|2b...2w4w|.2w...5b|5w...3b.|5b....2w|")))
+
   ]
 
