@@ -29,9 +29,9 @@ type DoublingCubeValue = Int
 data Side = White | Black
   deriving (Eq, Show)
 
-data Move = Move Pos Pos
-          | Enter Pos
-          | TakeOff Pos
+data Move = Move Side Pos Pos
+          | Enter Side Pos
+          | TakeOff Side Pos
   deriving (Eq, Show)
 
 data Game = Game { gameBoard :: Board
@@ -74,6 +74,7 @@ data InvalidDecision = InvalidDecision Game PlayerDecision InvalidDecisionType
 
 data InvalidDecisionType = MustEnterBeforeMoving
                          | MovePossible
+                         | NoPieces Pos
   deriving (Eq, Show)
 
 data InvalidAction = ActionInvalidForState GameState GameAction
@@ -100,8 +101,16 @@ opposite :: Side -> Side
 opposite White = Black
 opposite Black = White
 
-move :: Board -> Move -> Either InvalidAction Board
-move = error "TODO: move"
+move :: Board -> Move -> Either InvalidDecisionType Board
+move b@(Board board _ _) (Move side from to) = 
+  if pieceCount b from side == 0 then Left (NoPieces from) 
+  else error "TODO: move" 
+
+pieceCount :: Board -> Pos -> Side -> Int
+pieceCount (Board b _ _) pos side = 
+  case b !! pos of
+    Just (s, n) -> if s == side then n else 0
+    Nothing     -> 0
 
 performAction :: GameAction -> Game -> Either InvalidAction Game
 performAction a@(InitialThrows white black) game =
@@ -111,7 +120,7 @@ performAction a@(InitialThrows white black) game =
                }
   where
     side = if white > black then White else Black
-performAction a@(PlayerAction (Moves moves)) game =
+performAction a@(PlayerAction d@(Moves moves)) game =
   case gameState game of
     ToMove side _ ->
       updatedBoard >>= \b ->
@@ -119,10 +128,10 @@ performAction a@(PlayerAction (Moves moves)) game =
                      , gameBoard    = b
                      , gameState    = ToDouble (opposite side) -- TODO: only if owns the cube
                      }
-    s          ->
+    s             ->
       Left (ActionInvalidForState s a)
   where
-    updatedBoard = foldM move (gameBoard game) moves
+    updatedBoard = first (InvalidPlayerDecision . InvalidDecision game d) (foldM move (gameBoard game) moves)
 
 performActions :: [GameAction] -> Game -> Either InvalidAction Game
 performActions actions game = foldl' (\eg a -> eg >>= performAction a) (Right game) actions -- TODO: use foldM?
@@ -139,6 +148,11 @@ pipCount side (Game (Board poss _ _) _ _ _) = sum $ zipWith count (pipDists side
   where
     count dist (Just (s, n)) | s == side = n * dist
     count _    _                         = 0
+
+-- TODO: replace with Data.Bifunctor (first) once we move to base 4.8+
+first :: (a -> c) -> Either a b -> Either c b
+first f (Left l)  = Left (f l)
+first _ (Right r) = Right r
 
 {-
 perform :: PlayerDecision -> Game -> Either InvalidDecision Game

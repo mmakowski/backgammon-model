@@ -33,7 +33,7 @@ unitTests = testGroup "Unit tests"
 
   , testCase "board is updated after move" $
       gameBoard <$> (performActions [ (InitialThrows 3 1)
-                                    , (PlayerAction (Moves [Move 8 5, Move 6 5]))] newGame) @?=
+                                    , (PlayerAction (Moves [Move White 8 5, Move White 6 5]))] newGame) @?=
       (Right (fromJust (parseBoard "|2b...2w4w|.2w...5b|5w...3b.|5b....2w|")))
 
   ]
