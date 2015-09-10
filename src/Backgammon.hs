@@ -103,14 +103,32 @@ opposite Black = White
 
 move :: Board -> Move -> Either InvalidDecisionType Board
 move b@(Board board _ _) (Move side from to) = 
-  if pieceCount b from side == 0 then Left (NoPieces from) 
-  else error "TODO: move" 
+  if pieceCount b from side == 0 then Left (NoPieces from) -- TODO: test this
+  else decPieces from b >>= incPieces to side
+
+decPieces :: Pos -> Board -> Either InvalidDecisionType Board
+decPieces pos board@(Board b bw bb) =
+  case pieces board pos of
+    Just (s, n) -> Right (Board (take (pos-1) b ++ [Just (s, n-1)] ++ drop (pos) b) bw bb)
+    Nothing     -> Left (NoPieces pos)
+
+incPieces :: Pos -> Side -> Board -> Either InvalidDecisionType Board
+incPieces pos side board@(Board b bw bb) = 
+  Right (Board (take (pos-1) b ++ [Just (side, updatedCount)] ++ drop (pos) b) bw bb)
+  where 
+    updatedCount =
+      case pieces board pos of
+        Just (_, n) -> n+1
+        Nothing     -> 1
 
 pieceCount :: Board -> Pos -> Side -> Int
-pieceCount (Board b _ _) pos side = 
-  case b !! pos of
+pieceCount board pos side = 
+  case pieces board pos of
     Just (s, n) -> if s == side then n else 0
     Nothing     -> 0
+
+pieces :: Board -> Pos -> Maybe (Side, Int)
+pieces (Board board _ _) pos = board !! (pos-1)
 
 performAction :: GameAction -> Game -> Either InvalidAction Game
 performAction a@(InitialThrows white black) game =
