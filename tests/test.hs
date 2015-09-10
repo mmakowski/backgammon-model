@@ -1,7 +1,6 @@
 import Test.Tasty
 import Test.Tasty.HUnit
 import Control.Applicative ((<$>))
-import Data.Maybe (fromJust)
 
 import Backgammon
 
@@ -34,7 +33,10 @@ unitTests = testGroup "Unit tests"
   , testCase "board is updated after move" $
       gameBoard <$> (performActions [ (InitialThrows 3 1)
                                     , (PlayerAction (Moves [Move White 8 5, Move White 6 5]))] newGame) @?=
-      (Right (fromJust (parseBoard "|2b...2w4w|.2w...5b|5w...3b.|5b....2w|")))
+      (Right (fromRight (parseBoard "|b2...w2w4|.w2...b5|w5...b3.|b5....w2|")))
 
   ]
 
+fromRight :: Show a => Either a b -> b
+fromRight (Right v) = v
+fromRight (Left v) = error ("expected Right but got Left " ++ show v)

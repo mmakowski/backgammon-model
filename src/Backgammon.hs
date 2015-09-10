@@ -109,12 +109,12 @@ move b@(Board board _ _) (Move side from to) =
 decPieces :: Pos -> Board -> Either InvalidDecisionType Board
 decPieces pos board@(Board b bw bb) =
   case pieces board pos of
-    Just (s, n) -> Right (Board (take (pos-1) b ++ [Just (s, n-1)] ++ drop (pos) b) bw bb)
+    Just (s, n) -> Right (Board (take (pos-1) b ++ [Just (s, n-1)] ++ drop pos b) bw bb)
     Nothing     -> Left (NoPieces pos)
 
 incPieces :: Pos -> Side -> Board -> Either InvalidDecisionType Board
 incPieces pos side board@(Board b bw bb) = 
-  Right (Board (take (pos-1) b ++ [Just (side, updatedCount)] ++ drop (pos) b) bw bb)
+  Right (Board (take (pos-1) b ++ [Just (side, updatedCount)] ++ drop pos b) bw bb)
   where 
     updatedCount =
       case pieces board pos of
@@ -154,9 +154,61 @@ performAction a@(PlayerAction d@(Moves moves)) game =
 performActions :: [GameAction] -> Game -> Either InvalidAction Game
 performActions actions game = foldl' (\eg a -> eg >>= performAction a) (Right game) actions -- TODO: use foldM?
 
-parseBoard :: String -> Maybe Board
-parseBoard = error "TODO: parse"
+-- TODO: move to submodule?
+data BoardParserState = Start String Int
+                      | Contents [Maybe (Side, Int)] String Int
+                      | PieceCount [Maybe (Side, Int)] Side String Int
+                      | PieceCountCont [Maybe (Side, Int)] Side String String Int
+                      | Done [Maybe (Side, Int)]
+                      | Error BoardParseErrorType
+  deriving (Eq, Show)
 
+data BoardParseError = BoardParseError String BoardParseErrorType
+  deriving (Eq, Show)
+
+data BoardParseErrorType = InvalidParserStateAtEnd BoardParserState
+                         | UnexpectedCharacter Int Char [Char] -- pos, actual, expected
+                         | UnexpectedEndOfInput Int BoardParserState -- pos, state at end
+                         | InsufficientPointsSpecified Int Int -- pos, actual points
+  deriving (Eq, Show)
+
+parseBoard :: String -> Either BoardParseError Board
+parseBoard str = 
+  case parse (Start str 1) of
+    Done b  -> Right (Board b 0 0)
+    Error t -> Left (BoardParseError str t)
+    state   -> Left (BoardParseError str (InvalidParserStateAtEnd state))
+  where
+    parse :: BoardParserState -> BoardParserState
+    parse (Start (h:t) pos) = 
+      case h of
+        '|' -> parse (Contents [] t (pos+1))
+        c   -> Error (UnexpectedCharacter pos c "|")
+    parse (Contents board [] pos) =
+      if length board == 24 then Done board
+      else                       Error (InsufficientPointsSpecified pos (length board))
+    parse (Contents board (h:t) pos) =
+      case h of
+        '|' -> parse (Contents board t (pos+1))
+        '.' -> parse (Contents (board ++ [Nothing]) t (pos+1))
+        'w' -> parse (PieceCount board White t (pos+1))
+        'b' -> parse (PieceCount board Black t (pos+1))
+        c   -> Error (UnexpectedCharacter pos c ".wb")
+    parse state@(PieceCount _ _ [] pos) =
+      Error (UnexpectedEndOfInput pos state)
+    parse (PieceCount board side (h:t) pos) =
+      if isDigit h then parse (PieceCountCont board side [h] t (pos+1))
+      else              Error (UnexpectedCharacter pos h digits)
+    parse state@(PieceCountCont _ _ _ [] pos) =
+      Error (UnexpectedEndOfInput pos state)
+    parse (PieceCountCont board side acc (h:t) pos) =
+      if isDigit h            then parse (PieceCountCont board side (acc ++ [h]) t (pos+1))
+      else if any (== h) ".|wb" then parse (Contents (board ++ [Just (side, read acc)]) (h:t) pos)
+      else              Error (UnexpectedCharacter pos h (digits ++ ".|wb"))
+    digits = "0123456789"
+    isDigit c = any (== c) digits -- TODO: use ascii codes (more efficient)
+
+-- TODO: does not take into account the bar
 pipDists :: Side -> [Int]
 pipDists White = [1..24]
 pipDists Black = reverse [1..24]
