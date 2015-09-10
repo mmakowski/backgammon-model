@@ -3,12 +3,14 @@ import Test.Tasty.HUnit
 import Control.Applicative ((<$>))
 
 import Backgammon
+import Backgammon.Format
 
 main = defaultMain tests
 
 tests :: TestTree
 tests = testGroup "Tests" [unitTests]
 
+-- TODO: tests by module
 unitTests = testGroup "Unit tests"
   [ testCase "initial white pip count is 167" $
       pipCount White newGame @?= 167
