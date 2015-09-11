@@ -27,7 +27,18 @@ unitTests = testGroup "Backgammon.Model unit tests"
   , testCase "when initial throw is a tie the state is again 'players to throw initial'" $
       gameState <$> (performAction (InitialThrows 3 3) newGame) @?= (Right PlayersToThrowInitial)
 
-  -- TODO: all other cases: error
+  -- TODO: all other actions on new game: error
+
+  , testCase "before any doubles, after a move, the other player can double" $
+      gameState <$> (performActions [ (InitialThrows 3 1)
+                                    , (PlayerAction (Moves [Move White 8 5, Move White 6 5]))] newGame) @?=
+      (Right (ToDouble Black))
+
+  , testCase "after a move, the other player can throw instead of doubling" $
+      gameState <$> (performActions [ (InitialThrows 3 1)
+                                    , (PlayerAction (Moves [Move White 8 5, Move White 6 5]))
+                                    , (Throw (3, 5))] newGame) @?=
+      (Right (ToMove Black (5, 3)))
 
   , testCase "board is updated after move" $
       gameBoard <$> (performActions [ (InitialThrows 3 1)

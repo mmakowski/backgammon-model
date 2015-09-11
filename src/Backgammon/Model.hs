@@ -150,6 +150,14 @@ performAction a@(PlayerAction d@(Moves moves)) game =
       Left (ActionInvalidForState s a)
   where
     updatedBoard = first (InvalidPlayerDecision . InvalidDecision game d) (foldM move (gameBoard game) moves)
+performAction a@(Throw dice) game =
+  case gameState game of
+    ToDouble side ->
+      Right $ game { _gameActions = _gameActions game ++ [a]
+                   , gameState    = ToMove side (normDice dice)
+                   }
+    s             ->
+      Left (ActionInvalidForState s a)
 
 performActions :: [GameAction] -> Game -> Either InvalidAction Game
 performActions actions game = foldl' (\eg a -> eg >>= performAction a) (Right game) actions -- TODO: use foldM?
