@@ -15,6 +15,9 @@ unitTests = testGroup "Backgammon.Model unit tests"
   , testCase "initial black pip count is 167" $
       pipCount Black newGame @?= 167
 
+  , testCase "pip count is reduced by 4 after 3-1 move" $
+      pipCount White gameAfterInitialWhite31 @?= 163
+
   , testCase "initial game state is 'players to throw initial'" $
       gameState newGame @?= PlayersToThrowInitial
 
@@ -30,22 +33,22 @@ unitTests = testGroup "Backgammon.Model unit tests"
   -- TODO: all other actions on new game: error
 
   , testCase "before any doubles, after a move, the other player can double" $
-      gameState <$> (performActions [ (InitialThrows 3 1)
-                                    , (PlayerAction (Moves [Move White 8 5, Move White 6 5]))] newGame) @?=
-      (Right (ToDouble Black))
+      gameState gameAfterInitialWhite31 @?= (ToDouble Black)
 
   , testCase "after a move, the other player can throw instead of doubling" $
-      gameState <$> (performActions [ (InitialThrows 3 1)
-                                    , (PlayerAction (Moves [Move White 8 5, Move White 6 5]))
-                                    , (PlayerAction (Throw (3, 5)))] newGame) @?=
+      gameState <$> (performAction (PlayerAction (Throw (3, 5))) gameAfterInitialWhite31) @?=
       (Right (ToMove Black (5, 3)))
 
   , testCase "board is updated after move" $
-      gameBoard <$> (performActions [ (InitialThrows 3 1)
-                                    , (PlayerAction (Moves [Move White 8 5, Move White 6 5]))] newGame) @?=
-      (Right (fromRight (parseBoard "|b2...w2w4|.w2...b5|w5...b3.|b5....w2|")))
+      gameBoard gameAfterInitialWhite31 @?=
+      (fromRight (parseBoard "|b2...w2w4|.w2...b5|w5...b3.|b5....w2|"))
 
   ]
+
+gameAfterInitialWhite31 = fromRight $ performActions 
+  [ (InitialThrows 3 1)
+  , (PlayerAction (Moves [Move White 8 5, Move White 6 5]))
+  ] newGame
 
 fromRight :: Show a => Either a b -> b
 fromRight (Right v) = v
