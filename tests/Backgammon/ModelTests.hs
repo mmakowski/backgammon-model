@@ -1,3 +1,5 @@
+module Backgammon.ModelTests (unitTests) where
+
 import Test.Tasty
 import Test.Tasty.HUnit
 import Control.Applicative ((<$>))
@@ -5,13 +7,8 @@ import Control.Applicative ((<$>))
 import Backgammon
 import Backgammon.Format
 
-main = defaultMain tests
-
-tests :: TestTree
-tests = testGroup "Tests" [unitTests]
-
--- TODO: tests by module
-unitTests = testGroup "Unit tests"
+unitTests :: TestTree
+unitTests = testGroup "Backgammon.Model unit tests"
   [ testCase "initial white pip count is 167" $
       pipCount White newGame @?= 167
 
