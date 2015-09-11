@@ -51,11 +51,11 @@ data Result = Normal | Gammon | Backgammon
   deriving (Eq, Show)
 
 data GameAction = PlayerAction PlayerDecision
-                | Throw Dice
                 | InitialThrows Die Die
   deriving (Eq, Show)
 
 data PlayerDecision = Moves [Move]
+                    | Throw Dice
                     | Double
                     | AcceptDouble
                     | RejectDouble
@@ -150,7 +150,7 @@ performAction a@(PlayerAction d@(Moves moves)) game =
       Left (ActionInvalidForState s a)
   where
     updatedBoard = first (InvalidPlayerDecision . InvalidDecision game d) (foldM move (gameBoard game) moves)
-performAction a@(Throw dice) game =
+performAction a@(PlayerAction (Throw dice)) game =
   case gameState game of
     ToDouble side ->
       Right $ game { _gameActions = _gameActions game ++ [a]

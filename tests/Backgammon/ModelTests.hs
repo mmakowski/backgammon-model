@@ -37,7 +37,7 @@ unitTests = testGroup "Backgammon.Model unit tests"
   , testCase "after a move, the other player can throw instead of doubling" $
       gameState <$> (performActions [ (InitialThrows 3 1)
                                     , (PlayerAction (Moves [Move White 8 5, Move White 6 5]))
-                                    , (Throw (3, 5))] newGame) @?=
+                                    , (PlayerAction (Throw (3, 5)))] newGame) @?=
       (Right (ToMove Black (5, 3)))
 
   , testCase "board is updated after move" $
