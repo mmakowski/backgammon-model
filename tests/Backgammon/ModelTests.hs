@@ -10,13 +10,16 @@ import Backgammon.Format
 unitTests :: TestTree
 unitTests = testGroup "Backgammon.Model unit tests"
   [ testCase "initial white pip count is 167" $
-      pipCount White newGame @?= 167
+      pipCount White (gameBoard newGame) @?= 167
 
   , testCase "initial black pip count is 167" $
-      pipCount Black newGame @?= 167
+      pipCount Black (gameBoard newGame) @?= 167
 
   , testCase "pip count is reduced by 4 after 3-1 move" $
-      pipCount White gameAfterInitialWhite31 @?= 163
+      pipCount White (gameBoard gameAfterInitialWhite31) @?= 163
+
+  --, testCase "bar is included in pip count" $
+  --    pipCount White (fromRight (parseBoard "|b2....w5|.w3...b5|w5...b3.|b5....w1|w1")) @?= 168
 
   , testCase "initial game state is 'players to throw initial'" $
       gameState newGame @?= PlayersToThrowInitial

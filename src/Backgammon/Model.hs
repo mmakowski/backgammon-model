@@ -41,7 +41,7 @@ data Game = Game { gameBoard :: Board
                  }
   deriving (Eq, Show)
 
-data Board = Board [Maybe (Side, Int)] Int Int
+data Board = Board [Maybe (Side, Int)] Int Int -- board, bar white, bar black
   deriving (Eq, Show)
 
 data DoublingCube = DoublingCube (Maybe Side) DoublingCubeValue
@@ -167,8 +167,8 @@ pipDists :: Side -> [Int]
 pipDists White = [1..24]
 pipDists Black = reverse [1..24]
 
-pipCount :: Side -> Game -> Int
-pipCount side (Game (Board poss _ _) _ _ _) = sum $ zipWith count (pipDists side) poss
+pipCount :: Side -> Board -> Int
+pipCount side (Board poss _ _) = sum $ zipWith count (pipDists side) poss
   where
     count dist (Just (s, n)) | s == side = n * dist
     count _    _                         = 0
