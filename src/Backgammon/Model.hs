@@ -41,7 +41,9 @@ data Game = Game { gameBoard :: Board
                  }
   deriving (Eq, Show)
 
-data Board = Board [Maybe (Side, Int)] Int Int -- board, bar white, bar black
+data Board 
+  -- | fields, bar white, bar black
+  = Board [Maybe (Side, Int)] Int Int 
   deriving (Eq, Show)
 
 data DoublingCube = DoublingCube (Maybe Side) DoublingCubeValue
@@ -162,16 +164,19 @@ performAction a@(PlayerAction (Throw dice)) game =
 performActions :: [GameAction] -> Game -> Either InvalidAction Game
 performActions actions game = foldl' (\eg a -> eg >>= performAction a) (Right game) actions -- TODO: use foldM?
 
--- TODO: does not take into account the bar
 pipDists :: Side -> [Int]
 pipDists White = [1..24]
 pipDists Black = reverse [1..24]
 
 pipCount :: Side -> Board -> Int
-pipCount side (Board poss _ _) = sum $ zipWith count (pipDists side) poss
+pipCount side (Board poss barWhite barBlack) = bar + (sum (zipWith count (pipDists side) poss))
   where
     count dist (Just (s, n)) | s == side = n * dist
     count _    _                         = 0
+    bar = 
+      25 * case side of
+        White -> barWhite
+        Black -> barBlack
 
 -- TODO: replace with Data.Bifunctor (first) once we move to base 4.8+
 first :: (a -> c) -> Either a b -> Either c b

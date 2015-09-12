@@ -18,8 +18,8 @@ unitTests = testGroup "Backgammon.Model unit tests"
   , testCase "pip count is reduced by 4 after 3-1 move" $
       pipCount White (gameBoard gameAfterInitialWhite31) @?= 163
 
-  --, testCase "bar is included in pip count" $
-  --    pipCount White (fromRight (parseBoard "|b2....w5|.w3...b5|w5...b3.|b5....w1|w1")) @?= 168
+  , testCase "bar is included in pip count" $
+      pipCount White (fromRight (parseBoard "|b2....w5|.w3...b5|w5...b3.|b5....w1|w1")) @?= 168
 
   , testCase "initial game state is 'players to throw initial'" $
       gameState newGame @?= PlayersToThrowInitial
