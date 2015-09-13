@@ -62,6 +62,14 @@ unitTests = testGroup "Backgammon.Model unit tests"
       gameState <$> (performActions [PlayerAction Double, PlayerAction AcceptDouble, PlayerAction (Throw (2, 1))] gameAfterInitialWhite31) @?=
       (Right (ToMove Black (2, 1)))
 
+  , testCase "the owner of the cube can double before move" $
+      gameState <$> (performActions [ PlayerAction Double
+                                    , PlayerAction AcceptDouble
+                                    , PlayerAction (Throw (2, 1))
+                                    , PlayerAction (Moves [Move Black 1 2, Move Black 1 3])
+                                    ] gameAfterInitialWhite31) @?=
+      (Right (ToDouble White))
+
   , testCase "board is updated after move" $
       gameBoard gameAfterInitialWhite31 @?=
       (fromRight (parseBoard "|b2...w2w4|.w2...b5|w5...b3.|b5....w2|"))
