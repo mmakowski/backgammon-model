@@ -70,6 +70,16 @@ unitTests = testGroup "Backgammon.Model unit tests"
                                     ] gameAfterInitialWhite31) @?=
       (Right (ToDouble White))
 
+  , testCase "the player cannog double if opponent owns the cube" $
+      gameState <$> (performActions [ PlayerAction Double
+                                    , PlayerAction AcceptDouble
+                                    , PlayerAction (Throw (2, 1))
+                                    , PlayerAction (Moves [Move Black 1 2, Move Black 1 3])
+                                    , PlayerAction (Throw (2, 1))
+                                    , PlayerAction (Moves [Move White 24 23, Move White 24 22])
+                                    ] gameAfterInitialWhite31) @?=
+      (Right (ToThrow Black))
+
   , testCase "board is updated after move" $
       gameBoard gameAfterInitialWhite31 @?=
       (fromRight (parseBoard "|b2...w2w4|.w2...b5|w5...b3.|b5....w2|"))

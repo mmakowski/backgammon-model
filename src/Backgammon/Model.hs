@@ -150,9 +150,11 @@ performAction a@(InitialThrows white black)    game@(Game { gameState = PlayersT
     side = if white > black then White else Black
 performAction a@(PlayerAction d@(Moves moves)) game@(Game { gameState = ToMove side _ }) =
   updatedBoard >>= \b ->
-    success (game { gameBoard = b }) (ToDouble (opposite side)) a -- TODO: only if owns the cube
+    success (game { gameBoard = b }) (nextState (opposite side)) a
   where
     updatedBoard = first (InvalidPlayerDecision . InvalidDecision game d) (foldM move (gameBoard game) moves)
+    nextState = if not (ownsCube side) then ToDouble else ToThrow
+    ownsCube side = (doublingCubeOwner . gameDoublingCube) game == Just side 
 performAction a@(PlayerAction (Throw dice))    game@(Game { gameState = ToDouble side }) =
   success game (ToMove side (normDice dice)) a
 performAction a@(PlayerAction Double)          game@(Game { gameState = ToDouble side }) =
