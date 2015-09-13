@@ -77,6 +77,8 @@ data GameState = PlayersToThrowInitial
                | ToDouble Side
                | ToRespondToDouble Side
                | ToThrow Side
+               -- | winner, points scored
+               | GameFinished Side Int
   deriving (Eq, Show)
 
 data InvalidDecision = InvalidDecision Game PlayerDecision InvalidDecisionType
@@ -142,20 +144,15 @@ pieces (Board board _ _) pos = board !! (pos-1)
 
 performAction :: GameAction -> Game -> Either InvalidAction Game
 performAction a@(InitialThrows white black) game =
-  Right $ game { _gameActions = _gameActions game ++ [a]
-               , gameState    = if white /= black then ToMove side (normDice (white, black))
-                                else                   PlayersToThrowInitial
-               }
+  success game (if white /= black then ToMove side (normDice (white, black))
+                else                   PlayersToThrowInitial) a
   where
     side = if white > black then White else Black
 performAction a@(PlayerAction d@(Moves moves)) game =
   case gameState game of
     ToMove side _ ->
       updatedBoard >>= \b ->
-        Right $ game { _gameActions = _gameActions game ++ [a]
-                     , gameBoard    = b
-                     , gameState    = ToDouble (opposite side) -- TODO: only if owns the cube
-                     }
+        success (game { gameBoard = b }) (ToDouble (opposite side)) a -- TODO: only if owns the cube
     s             ->
       Left (ActionInvalidForState s a)
   where
@@ -163,31 +160,40 @@ performAction a@(PlayerAction d@(Moves moves)) game =
 performAction a@(PlayerAction (Throw dice)) game =
   case gameState game of
     ToDouble side ->
-      Right $ game { _gameActions = _gameActions game ++ [a]
-                   , gameState    = ToMove side (normDice dice)
-                   }
+      success game (ToMove side (normDice dice)) a
     s             ->
       Left (ActionInvalidForState s a)
 performAction a@(PlayerAction Double) game =
   case gameState game of
     ToDouble side ->
-      Right $ game { _gameActions = _gameActions game ++ [a]
-                   , gameState    = ToRespondToDouble (opposite side)
-                   }
+      success game (ToRespondToDouble (opposite side)) a
     s              ->
       Left (ActionInvalidForState s a)
 performAction a@(PlayerAction AcceptDouble) game =
   case gameState game of
     ToRespondToDouble side ->
-      Right $ game { _gameActions = _gameActions game ++ [a]
-                   , gameDoublingCube = acceptDouble side (gameDoublingCube game)
-                   , gameState    = ToThrow (opposite side)
-                   }
+      success (game { gameDoublingCube = acceptDouble side (gameDoublingCube game) }) (ToThrow (opposite side)) a
+    s              ->
+      Left (ActionInvalidForState s a)
+performAction a@(PlayerAction RejectDouble) game =
+  case gameState game of
+    ToRespondToDouble side ->
+      success game (GameFinished (opposite side) ((doublingCubeValue . gameDoublingCube) game)) a
     s              ->
       Left (ActionInvalidForState s a)
 
 performActions :: [GameAction] -> Game -> Either InvalidAction Game
 performActions actions game = foldl' (\eg a -> eg >>= performAction a) (Right game) actions -- TODO: use foldM?
+
+success :: Game -> GameState -> GameAction -> Either InvalidAction Game
+success game state action =
+  Right ((appendAction action . moveToState state) game)
+
+moveToState :: GameState -> Game -> Game
+moveToState state game = game { gameState = state }
+
+appendAction :: GameAction -> Game -> Game
+appendAction action game = game { _gameActions = _gameActions game ++ [action] }
 
 pipDists :: Side -> [Int]
 pipDists White = [1..24]

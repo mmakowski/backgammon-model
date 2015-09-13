@@ -54,6 +54,10 @@ unitTests = testGroup "Backgammon.Model unit tests"
       gameState <$> (performActions [PlayerAction Double, PlayerAction AcceptDouble] gameAfterInitialWhite31) @?=
       (Right (ToThrow Black))
 
+  , testCase "after double is rejected the game ends" $
+      gameState <$> (performActions [PlayerAction Double, PlayerAction RejectDouble] gameAfterInitialWhite31) @?=
+      (Right (GameFinished Black 1))
+      
   , testCase "board is updated after move" $
       gameBoard gameAfterInitialWhite31 @?=
       (fromRight (parseBoard "|b2...w2w4|.w2...b5|w5...b3.|b5....w2|"))
