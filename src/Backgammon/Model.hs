@@ -69,6 +69,7 @@ data PlayerDecision = Moves [Move]
 data GameState = PlayersToThrowInitial
                | ToMove Side Dice
                | ToDouble Side
+               | ToRespondToDouble Side
   deriving (Eq, Show)
 
 data InvalidDecision = InvalidDecision Game PlayerDecision InvalidDecisionType
@@ -159,6 +160,14 @@ performAction a@(PlayerAction (Throw dice)) game =
                    , gameState    = ToMove side (normDice dice)
                    }
     s             ->
+      Left (ActionInvalidForState s a)
+performAction a@(PlayerAction Double) game =
+  case gameState game of
+    ToDouble side ->
+      Right $ game { _gameActions = _gameActions game ++ [a]
+                   , gameState    = ToRespondToDouble (opposite side)
+                   }
+    s              ->
       Left (ActionInvalidForState s a)
 
 performActions :: [GameAction] -> Game -> Either InvalidAction Game
