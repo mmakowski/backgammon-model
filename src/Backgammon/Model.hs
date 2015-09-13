@@ -161,6 +161,8 @@ performAction a@(PlayerAction AcceptDouble)    game@(Game { gameState = ToRespon
   success (game { gameDoublingCube = acceptDouble side (gameDoublingCube game) }) (ToThrow (opposite side)) a
 performAction a@(PlayerAction RejectDouble)    game@(Game { gameState = ToRespondToDouble side }) =
   success game (GameFinished (opposite side) ((doublingCubeValue . gameDoublingCube) game)) a
+performAction a@(PlayerAction (Throw dice))    game@(Game { gameState = ToThrow side }) =
+  success game (ToMove side (normDice dice)) a
 performAction action                           game =
   Left (ActionInvalidForState (gameState game) action)
 
