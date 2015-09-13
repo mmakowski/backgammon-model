@@ -1,14 +1,18 @@
 module Backgammon.Model
 ( Side (White, Black)
 , Game
-, Board (..) -- TODO: smart constructor
+, Board (..) -- TODO: smart constructor and accessors
+, DoublingCube
 , GameAction (..)
 , GameState (..)
 , PlayerDecision (..)
 , Move (..)
 , newGame
 , gameBoard
+, gameDoublingCube
 , gameState
+, doublingCubeOwner
+, doublingCubeValue
 , performAction
 , performActions
 , pipCount
@@ -36,7 +40,7 @@ data Move = Move Side Pos Pos
 
 data Game = Game { gameBoard :: Board
                  , _gameActions :: [GameAction]
-                 , _gameDoublingCube :: DoublingCube
+                 , gameDoublingCube :: DoublingCube
                  , gameState :: GameState
                  }
   deriving (Eq, Show)
@@ -46,7 +50,9 @@ data Board
   = Board [Maybe (Side, Int)] Int Int 
   deriving (Eq, Show)
 
-data DoublingCube = DoublingCube (Maybe Side) DoublingCubeValue
+data DoublingCube = DoublingCube { doublingCubeOwner :: Maybe Side
+                                 , doublingCubeValue :: DoublingCubeValue
+                                 }
   deriving (Eq, Show)
 
 data Result = Normal | Gammon | Backgammon
@@ -70,6 +76,7 @@ data GameState = PlayersToThrowInitial
                | ToMove Side Dice
                | ToDouble Side
                | ToRespondToDouble Side
+               | ToThrow Side
   deriving (Eq, Show)
 
 data InvalidDecision = InvalidDecision Game PlayerDecision InvalidDecisionType
@@ -169,6 +176,15 @@ performAction a@(PlayerAction Double) game =
                    }
     s              ->
       Left (ActionInvalidForState s a)
+performAction a@(PlayerAction AcceptDouble) game =
+  case gameState game of
+    ToRespondToDouble side ->
+      Right $ game { _gameActions = _gameActions game ++ [a]
+                   , gameDoublingCube = acceptDouble side (gameDoublingCube game)
+                   , gameState    = ToThrow (opposite side)
+                   }
+    s              ->
+      Left (ActionInvalidForState s a)
 
 performActions :: [GameAction] -> Game -> Either InvalidAction Game
 performActions actions game = foldl' (\eg a -> eg >>= performAction a) (Right game) actions -- TODO: use foldM?
@@ -186,6 +202,9 @@ pipCount side (Board poss barWhite barBlack) = bar + (sum (zipWith count (pipDis
       25 * case side of
         White -> barWhite
         Black -> barBlack
+
+acceptDouble :: Side -> DoublingCube -> DoublingCube
+acceptDouble side (DoublingCube _ value) = DoublingCube (Just side) (value * 2)
 
 -- TODO: replace with Data.Bifunctor (first) once we move to base 4.8+
 first :: (a -> c) -> Either a b -> Either c b
