@@ -2,6 +2,7 @@ module Backgammon.Format
 ( BoardParserState (..)
 , BoardParseError (..)
 , BoardParseErrorType (..)
+, formatBoard
 , parseBoard
 )
 where
@@ -40,6 +41,20 @@ data BoardParseErrorType
   -- | pos, actual points
   | InsufficientPointsSpecified Int Int
   deriving (Eq, Show)
+
+formatBoard :: Board -> String
+formatBoard (Board points barWhite barBlack) =
+  formatBar 'b' barBlack ++
+  "|" ++ formatPoints points ++
+  formatBar 'w' barWhite
+  where
+    formatPoints [] = ""
+    formatPoints p = (concatMap formatPoint (take 6 p)) ++ "|" ++ formatPoints (drop 6 p)
+    formatPoint Nothing = "."
+    formatPoint (Just (side, count)) = sideChar side : show count
+    formatBar side count = if count == 0 then "" else side : show count
+    sideChar Black = 'b'
+    sideChar White = 'w'
 
 -- TODO: docs
 parseBoard :: String -> Either BoardParseError Board

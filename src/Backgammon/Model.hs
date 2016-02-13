@@ -33,6 +33,7 @@ type DoublingCubeValue = Int
 data Side = White | Black
   deriving (Eq, Show)
 
+-- TODO: remove side from move, it will be implicit in action
 data Move = Move Side Pos Pos
           | Enter Side Pos
           | TakeOff Side Pos
@@ -58,7 +59,7 @@ data DoublingCube = DoublingCube { doublingCubeOwner :: Maybe Side
 data Result = Normal | Gammon | Backgammon
   deriving (Eq, Show)
 
-data GameAction = PlayerAction PlayerDecision
+data GameAction = PlayerAction PlayerDecision -- TODO: add side
                 | InitialThrows Die Die
   deriving (Eq, Show)
 
@@ -87,6 +88,7 @@ data InvalidDecision = InvalidDecision Game PlayerDecision InvalidDecisionType
 data InvalidDecisionType = MustEnterBeforeMoving
                          | MovePossible
                          | NoPieces Pos
+                         | MustMoveOwnPieces Side
   deriving (Eq, Show)
 
 data InvalidAction = ActionInvalidForState GameState GameAction
@@ -152,6 +154,8 @@ performAction a@(PlayerAction d@(Moves moves)) game@(Game { gameState = ToMove s
   updatedBoard >>= \b ->
     success (game { gameBoard = b }) (nextState (opposite side)) a
   where
+    -- TODO: verify that moves own pieces
+    -- TODO: verify that moves by the right numbers
     updatedBoard = first (InvalidPlayerDecision . InvalidDecision game d) (foldM move (gameBoard game) moves)
     nextState = if not (ownsCube side) then ToDouble else ToThrow
     ownsCube side = (doublingCubeOwner . gameDoublingCube) game == Just side 

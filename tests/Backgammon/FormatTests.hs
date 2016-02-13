@@ -19,4 +19,5 @@ unitTests = testGroup "Backgammon.Format unit tests"
                     ]
                     2
                     1))
+    -- TODO: formatBoard tests
   ]
