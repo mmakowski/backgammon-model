@@ -41,9 +41,12 @@ unitTests = testGroup "Backgammon.Model unit tests"
 
   , testCase "player cannot move opponent's pieces" $
       let gameAfter21 = fromRight (performAction (InitialThrows 2 1) newGame)
-          badMove = Moves [Move 1 2, Move 1 3]
+          badMove = Moves [Move 24 23, Move 1 3]
       in performAction (PlayerAction White badMove) gameAfter21 @?=
          Left (InvalidPlayerDecision gameAfter21 badMove (MustMoveOwnPieces White))
+
+  -- TODO: must move forward
+  -- TODO: cannot move onto occupied point
 
   -- * doubling
 
