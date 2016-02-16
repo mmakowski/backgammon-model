@@ -6,6 +6,8 @@ module Backgammon
 , GameState (..)
 , PlayerDecision (..)
 , Move (..)
+, InvalidAction (..)
+, InvalidDecisionType (..)
 , newGame
 , gameBoard
 , gameDoublingCube

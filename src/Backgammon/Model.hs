@@ -7,6 +7,8 @@ module Backgammon.Model
 , GameState (..)
 , PlayerDecision (..)
 , Move (..)
+, InvalidAction (..)
+, InvalidDecisionType (..)
 , newGame
 , gameBoard
 , gameDoublingCube
@@ -82,9 +84,6 @@ data GameState = PlayersToThrowInitial
                | GameFinished Side Int
   deriving (Eq, Show)
 
-data InvalidDecision = InvalidDecision Game PlayerDecision InvalidDecisionType
-  deriving (Eq, Show)
-
 data InvalidDecisionType = MustEnterBeforeMoving
                          | MovePossible
                          | NoPieces Pos
@@ -92,7 +91,7 @@ data InvalidDecisionType = MustEnterBeforeMoving
   deriving (Eq, Show)
 
 data InvalidAction = ActionInvalidForState GameState GameAction
-                   | InvalidPlayerDecision InvalidDecision
+                   | InvalidPlayerDecision Game PlayerDecision InvalidDecisionType
   deriving (Eq, Show)
 
 newGame :: Game
@@ -115,10 +114,11 @@ opposite :: Side -> Side
 opposite White = Black
 opposite Black = White
 
-move :: Board -> Move -> Either InvalidDecisionType Board
-move board (Move from to) = 
+move :: Side -> Board -> Move -> Either InvalidDecisionType Board
+move side board (Move from to) = 
   case pieces board from of
-    Just (s, _) -> decPieces from board >>= incPieces to s 
+    Just (s, _) -> if s == side then decPieces from board >>= incPieces to side 
+                                else Left (MustMoveOwnPieces side)
     Nothing     -> Left (NoPieces from) -- TODO: test this
 
 decPieces :: Pos -> Board -> Either InvalidDecisionType Board
@@ -152,7 +152,7 @@ performAction a@(PlayerAction aSide d@(Moves moves)) game@(Game { gameState = To
   where
     -- TODO: verify that moves own pieces
     -- TODO: verify that moves by the right numbers
-    updatedBoard = first (InvalidPlayerDecision . InvalidDecision game d) (foldM move (gameBoard game) moves)
+    updatedBoard = first (InvalidPlayerDecision game d) (foldM (move side) (gameBoard game) moves)
     nextState = if not (ownsCube side) then ToDouble else ToThrow
     ownsCube side = (doublingCubeOwner . gameDoublingCube) game == Just side 
 performAction a@(PlayerAction aSide (Throw dice))    game@(Game { gameState = ToDouble side })          | aSide == side =
