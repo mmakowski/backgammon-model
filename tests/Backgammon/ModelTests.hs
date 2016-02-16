@@ -39,44 +39,45 @@ unitTests = testGroup "Backgammon.Model unit tests"
       gameState gameAfterInitialWhite31 @?= (ToDouble Black)
 
   , testCase "after a move the other player can throw instead of doubling" $
-      gameState <$> (performAction (PlayerAction (Throw (3, 5))) gameAfterInitialWhite31) @?=
+      gameState <$> (performAction (PlayerAction Black (Throw (3, 5))) gameAfterInitialWhite31) @?=
       (Right (ToMove Black (5, 3)))
 
   , testCase "after doubling the other player must respond" $
-      gameState <$> (performAction (PlayerAction Double) gameAfterInitialWhite31) @?=
+      gameState <$> (performAction (PlayerAction Black Double) gameAfterInitialWhite31) @?=
       (Right (ToRespondToDouble White))
 
   , testCase "after double is accepted the doubling cube is updated" $
-      (\dc -> (doublingCubeOwner dc, doublingCubeValue dc)) <$> gameDoublingCube <$> (performActions [PlayerAction Double, PlayerAction AcceptDouble] gameAfterInitialWhite31) @?=
+      (\dc -> (doublingCubeOwner dc, doublingCubeValue dc)) <$> gameDoublingCube 
+                                                            <$> (performActions [PlayerAction Black Double, PlayerAction White AcceptDouble] gameAfterInitialWhite31) @?=
       (Right ((Just White), 2))
 
   , testCase "after double is accepted the player must throw" $
-      gameState <$> (performActions [PlayerAction Double, PlayerAction AcceptDouble] gameAfterInitialWhite31) @?=
+      gameState <$> (performActions [PlayerAction Black Double, PlayerAction White AcceptDouble] gameAfterInitialWhite31) @?=
       (Right (ToThrow Black))
 
   , testCase "after double is rejected the game ends" $
-      gameState <$> (performActions [PlayerAction Double, PlayerAction RejectDouble] gameAfterInitialWhite31) @?=
+      gameState <$> (performActions [PlayerAction Black Double, PlayerAction White RejectDouble] gameAfterInitialWhite31) @?=
       (Right (GameFinished Black 1))
       
   , testCase "after double is accepted and the player throws, they must move" $
-      gameState <$> (performActions [PlayerAction Double, PlayerAction AcceptDouble, PlayerAction (Throw (2, 1))] gameAfterInitialWhite31) @?=
+      gameState <$> (performActions [PlayerAction Black Double, PlayerAction White AcceptDouble, PlayerAction Black (Throw (2, 1))] gameAfterInitialWhite31) @?=
       (Right (ToMove Black (2, 1)))
 
   , testCase "the owner of the cube can double before move" $
-      gameState <$> (performActions [ PlayerAction Double
-                                    , PlayerAction AcceptDouble
-                                    , PlayerAction (Throw (2, 1))
-                                    , PlayerAction (Moves [Move Black 1 2, Move Black 1 3])
+      gameState <$> (performActions [ PlayerAction Black Double
+                                    , PlayerAction White AcceptDouble
+                                    , PlayerAction Black (Throw (2, 1))
+                                    , PlayerAction Black (Moves [Move 1 2, Move 1 3])
                                     ] gameAfterInitialWhite31) @?=
       (Right (ToDouble White))
 
   , testCase "the player cannog double if opponent owns the cube" $
-      gameState <$> (performActions [ PlayerAction Double
-                                    , PlayerAction AcceptDouble
-                                    , PlayerAction (Throw (2, 1))
-                                    , PlayerAction (Moves [Move Black 1 2, Move Black 1 3])
-                                    , PlayerAction (Throw (2, 1))
-                                    , PlayerAction (Moves [Move White 24 23, Move White 24 22])
+      gameState <$> (performActions [ PlayerAction Black Double
+                                    , PlayerAction White AcceptDouble
+                                    , PlayerAction Black (Throw (2, 1))
+                                    , PlayerAction Black (Moves [Move 1 2, Move 1 3])
+                                    , PlayerAction White (Throw (2, 1))
+                                    , PlayerAction White (Moves [Move 24 23, Move 24 22])
                                     ] gameAfterInitialWhite31) @?=
       (Right (ToThrow Black))
 
@@ -88,7 +89,7 @@ unitTests = testGroup "Backgammon.Model unit tests"
 
 gameAfterInitialWhite31 = fromRight $ performActions 
   [ InitialThrows 3 1
-  , PlayerAction (Moves [Move White 8 5, Move White 6 5])
+  , PlayerAction White (Moves [Move 8 5, Move 6 5])
   ] newGame
 
 fromRight :: Show a => Either a b -> b

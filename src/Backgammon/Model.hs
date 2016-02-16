@@ -21,6 +21,7 @@ where
 
 import Control.Monad (foldM)
 import Data.List (foldl')
+import Data.Maybe (fromMaybe)
 
 type Pos = Int
 
@@ -33,10 +34,9 @@ type DoublingCubeValue = Int
 data Side = White | Black
   deriving (Eq, Show)
 
--- TODO: remove side from move, it will be implicit in action
-data Move = Move Side Pos Pos
-          | Enter Side Pos
-          | TakeOff Side Pos
+data Move = Move Pos Pos
+          | Enter Pos
+          | TakeOff Pos
   deriving (Eq, Show)
 
 data Game = Game { gameBoard :: Board
@@ -59,7 +59,7 @@ data DoublingCube = DoublingCube { doublingCubeOwner :: Maybe Side
 data Result = Normal | Gammon | Backgammon
   deriving (Eq, Show)
 
-data GameAction = PlayerAction PlayerDecision -- TODO: add side
+data GameAction = PlayerAction Side PlayerDecision
                 | InitialThrows Die Die
   deriving (Eq, Show)
 
@@ -116,9 +116,10 @@ opposite White = Black
 opposite Black = White
 
 move :: Board -> Move -> Either InvalidDecisionType Board
-move b@(Board board _ _) (Move side from to) = 
-  if pieceCount b from side == 0 then Left (NoPieces from) -- TODO: test this
-  else decPieces from b >>= incPieces to side
+move board (Move from to) = 
+  case pieces board from of
+    Just (s, _) -> decPieces from board >>= incPieces to s 
+    Nothing     -> Left (NoPieces from) -- TODO: test this
 
 decPieces :: Pos -> Board -> Either InvalidDecisionType Board
 decPieces pos board@(Board b bw bb) =
@@ -127,19 +128,14 @@ decPieces pos board@(Board b bw bb) =
     Nothing     -> Left (NoPieces pos)
 
 incPieces :: Pos -> Side -> Board -> Either InvalidDecisionType Board
-incPieces pos side board@(Board b bw bb) = 
+incPieces pos side board@(Board b bw bb) =
+  -- TODO: Left when owner of target is different from side
   Right (Board (take (pos-1) b ++ [Just (side, updatedCount)] ++ drop pos b) bw bb)
-  where 
+  where
     updatedCount =
       case pieces board pos of
         Just (_, n) -> n+1
         Nothing     -> 1
-
-pieceCount :: Board -> Pos -> Side -> Int
-pieceCount board pos side = 
-  case pieces board pos of
-    Just (s, n) -> if s == side then n else 0
-    Nothing     -> 0
 
 pieces :: Board -> Pos -> Maybe (Side, Int)
 pieces (Board board _ _) pos = board !! (pos-1)
@@ -150,7 +146,7 @@ performAction a@(InitialThrows white black)    game@(Game { gameState = PlayersT
                 else                   PlayersToThrowInitial) a
   where
     side = if white > black then White else Black
-performAction a@(PlayerAction d@(Moves moves)) game@(Game { gameState = ToMove side _ }) =
+performAction a@(PlayerAction aSide d@(Moves moves)) game@(Game { gameState = ToMove side _ })          | aSide == side =
   updatedBoard >>= \b ->
     success (game { gameBoard = b }) (nextState (opposite side)) a
   where
@@ -159,17 +155,17 @@ performAction a@(PlayerAction d@(Moves moves)) game@(Game { gameState = ToMove s
     updatedBoard = first (InvalidPlayerDecision . InvalidDecision game d) (foldM move (gameBoard game) moves)
     nextState = if not (ownsCube side) then ToDouble else ToThrow
     ownsCube side = (doublingCubeOwner . gameDoublingCube) game == Just side 
-performAction a@(PlayerAction (Throw dice))    game@(Game { gameState = ToDouble side }) =
+performAction a@(PlayerAction aSide (Throw dice))    game@(Game { gameState = ToDouble side })          | aSide == side =
   success game (ToMove side (normDice dice)) a
-performAction a@(PlayerAction Double)          game@(Game { gameState = ToDouble side }) =
+performAction a@(PlayerAction aSide Double)          game@(Game { gameState = ToDouble side })          | aSide == side =
   success game (ToRespondToDouble (opposite side)) a
-performAction a@(PlayerAction AcceptDouble)    game@(Game { gameState = ToRespondToDouble side }) =
+performAction a@(PlayerAction aSide AcceptDouble)    game@(Game { gameState = ToRespondToDouble side }) | aSide == side =
   success (game { gameDoublingCube = acceptDouble side (gameDoublingCube game) }) (ToThrow (opposite side)) a
-performAction a@(PlayerAction RejectDouble)    game@(Game { gameState = ToRespondToDouble side }) =
+performAction a@(PlayerAction aSide RejectDouble)    game@(Game { gameState = ToRespondToDouble side }) | aSide == side =
   success game (GameFinished (opposite side) ((doublingCubeValue . gameDoublingCube) game)) a
-performAction a@(PlayerAction (Throw dice))    game@(Game { gameState = ToThrow side }) =
+performAction a@(PlayerAction aSide (Throw dice))    game@(Game { gameState = ToThrow side })           | aSide == side =
   success game (ToMove side (normDice dice)) a
-performAction action                           game =
+performAction action                                 game =
   Left (ActionInvalidForState (gameState game) action)
 
 performActions :: [GameAction] -> Game -> Either InvalidAction Game
