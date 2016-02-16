@@ -45,6 +45,8 @@ unitTests = testGroup "Backgammon.Model unit tests"
       in performAction (PlayerAction White badMove) gameAfter21 @?=
          Left (InvalidPlayerDecision gameAfter21 badMove (MustMoveOwnPieces White))
 
+  -- TODO: must move the correct number of pips (regular)
+  -- TODO; must move the correct number of pips (double)
   -- TODO: must move forward
   -- TODO: cannot move onto occupied point
 
