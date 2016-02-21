@@ -123,9 +123,9 @@ opposite White = Black
 opposite Black = White
 
 distance :: Side -> Move -> Int
-distance side (Move from to) = (direction side) * (to - from)
-distance side (Enter to)     = (direction side) * (to - barIndex side)
-distance side (BearOff from) = (direction side) * (bearOffIndex side - from)
+distance side (Move from to) = direction side * (to - from)
+distance side (Enter to)     = direction side * (to - barIndex side)
+distance side (BearOff from) = direction side * (bearOffIndex side - from)
 
 move :: Side                                      -- ^ the side making the move
      -> (Board, [Die])                            -- ^ the board and available dice
@@ -169,29 +169,29 @@ pieces :: Board -> Pos -> Maybe (Side, Int)
 pieces (Board board _ _) pos = board !! (pos-1)
 
 performAction :: GameAction -> Game -> Either InvalidAction Game
-performAction a@(InitialThrows white black)    game@(Game { gameState = PlayersToThrowInitial }) =
+performAction a@(InitialThrows white black)          game@Game{ gameState = PlayersToThrowInitial } =
   success game (if white /= black then ToMove side (normDice (white, black))
                 else                   PlayersToThrowInitial) a
   where
     side = if white > black then White else Black
-performAction a@(PlayerAction aSide d@(Moves moves)) game@(Game { gameState = ToMove side dice })   | aSide == side = do
+performAction a@(PlayerAction aSide d@(Moves moves)) game@Game{ gameState = ToMove side dice }       | aSide == side = do
   _ <- wrapInInvalidDecision (checkMovesLegal side board dice moves)
-  updatedBoard <- wrapInInvalidDecision (fst <$> foldM (move side) (board, (dieList dice)) moves)
+  updatedBoard <- wrapInInvalidDecision (fst <$> foldM (move side) (board, dieList dice) moves)
   success (game { gameBoard = updatedBoard }) (nextState (opposite side)) a
   where
     board = gameBoard game
     wrapInInvalidDecision = first (InvalidPlayerDecision game d)
     nextState = if not (ownsCube side) then ToDouble else ToThrow
     ownsCube side = (doublingCubeOwner . gameDoublingCube) game == Just side 
-performAction a@(PlayerAction aSide (Throw dice))    game@(Game { gameState = ToDouble side })          | aSide == side =
+performAction a@(PlayerAction aSide (Throw dice))    game@Game{ gameState = ToDouble side }          | aSide == side =
   success game (ToMove side (normDice dice)) a
-performAction a@(PlayerAction aSide Double)          game@(Game { gameState = ToDouble side })          | aSide == side =
+performAction a@(PlayerAction aSide Double)          game@Game{ gameState = ToDouble side }          | aSide == side =
   success game (ToRespondToDouble (opposite side)) a
-performAction a@(PlayerAction aSide AcceptDouble)    game@(Game { gameState = ToRespondToDouble side }) | aSide == side =
+performAction a@(PlayerAction aSide AcceptDouble)    game@Game{ gameState = ToRespondToDouble side } | aSide == side =
   success (game { gameDoublingCube = acceptDouble side (gameDoublingCube game) }) (ToThrow (opposite side)) a
-performAction a@(PlayerAction aSide RejectDouble)    game@(Game { gameState = ToRespondToDouble side }) | aSide == side =
+performAction a@(PlayerAction aSide RejectDouble)    game@Game{ gameState = ToRespondToDouble side } | aSide == side =
   success game (GameFinished (opposite side) ((doublingCubeValue . gameDoublingCube) game)) a
-performAction a@(PlayerAction aSide (Throw dice))    game@(Game { gameState = ToThrow side })           | aSide == side =
+performAction a@(PlayerAction aSide (Throw dice))    game@Game{ gameState = ToThrow side }           | aSide == side =
   success game (ToMove side (normDice dice)) a
 performAction action                                 game =
   Left (ActionInvalidForState (gameState game) action)
@@ -242,7 +242,7 @@ legalMoves side board dice = Set.fromList (legalMoves' board (dieList dice))
     moves _ _ 25 = []
     moves b d i =
       case pieces b i of
-        Just (s, n) -> if s == side then (Move i (i+d*(direction side))):nextMoves
+        Just (s, n) -> if s == side then Move i (i + d * direction side) : nextMoves
                                     else nextMoves
         Nothing -> nextMoves
       where nextMoves = moves b d (i+1)
