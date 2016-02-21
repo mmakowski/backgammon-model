@@ -1,6 +1,6 @@
 name:              backgammon-model
 version:           0.1.0.0
-cabal-version:     >= 1.20
+cabal-version:     >= 1.18
 license:           MIT
 author:            Maciek Makowski
 synopsis:          A model of backgammon game
