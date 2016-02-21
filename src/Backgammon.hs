@@ -17,6 +17,7 @@ module Backgammon
 , performAction
 , performActions
 , pipCount
+, legalMoves
 )
 where
 

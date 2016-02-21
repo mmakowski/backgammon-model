@@ -18,13 +18,17 @@ module Backgammon.Model
 , performAction
 , performActions
 , pipCount
+, legalMoves
 )
 where
 
 import Control.Applicative ((<$>))
 import Control.Monad (foldM)
-import Data.List (foldl')
+import Data.List (foldl', permutations)
 import Data.Maybe (fromMaybe)
+
+import Data.Set (Set)
+import qualified Data.Set as Set (elems, empty, fromList)
 
 type Pos = Int
 
@@ -40,7 +44,7 @@ data Side = White | Black
 data Move = Move Pos Pos
           | Enter Pos
           | BearOff Pos
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data Game = Game { gameBoard :: Board
                  , _gameActions :: [GameAction]
@@ -86,7 +90,7 @@ data GameState = PlayersToThrowInitial
   deriving (Eq, Show)
 
 data InvalidDecisionType = MustEnterBeforeMoving
-                         | MovePossible
+                         | MoreMovesPossible
                          | NoPieces Pos
                          | MovedOpponentsPieces Side
                          -- | incorrect move, available numbers of pips to move by
@@ -145,8 +149,11 @@ move side (board, dice) m@(Move from to) = do
 decPieces :: Pos -> Board -> Either InvalidDecisionType Board
 decPieces pos board@(Board b bw bb) =
   case pieces board pos of
-    Just (s, n) -> Right (Board (take (pos-1) b ++ [Just (s, n-1)] ++ drop pos b) bw bb)
+    Just (s, n) -> Right (Board (take (pos-1) b ++ [dec1 s n] ++ drop pos b) bw bb)
     Nothing     -> Left (NoPieces pos)
+  where
+    dec1 _ 1 = Nothing
+    dec1 s n = Just (s, n-1)
 
 incPieces :: Pos -> Side -> Board -> Either InvalidDecisionType Board
 incPieces pos side board@(Board b bw bb) =
@@ -167,13 +174,13 @@ performAction a@(InitialThrows white black)    game@(Game { gameState = PlayersT
                 else                   PlayersToThrowInitial) a
   where
     side = if white > black then White else Black
-performAction a@(PlayerAction aSide d@(Moves moves)) game@(Game { gameState = ToMove side (d1, d2) })   | aSide == side =
-  updatedBoard >>= \b ->
-    success (game { gameBoard = b }) (nextState (opposite side)) a
+performAction a@(PlayerAction aSide d@(Moves moves)) game@(Game { gameState = ToMove side dice })   | aSide == side = do
+  _ <- wrapInInvalidDecision (checkMovesLegal side board dice moves)
+  updatedBoard <- wrapInInvalidDecision (fst <$> foldM (move side) (board, (dieList dice)) moves)
+  success (game { gameBoard = updatedBoard }) (nextState (opposite side)) a
   where
-    -- TODO: verify that moves own pieces
-    -- TODO: verify that moves by the right numbers
-    updatedBoard = first (InvalidPlayerDecision game d) (fst <$> foldM (move side) (gameBoard game, [d1, d2]) moves)
+    board = gameBoard game
+    wrapInInvalidDecision = first (InvalidPlayerDecision game d)
     nextState = if not (ownsCube side) then ToDouble else ToThrow
     ownsCube side = (doublingCubeOwner . gameDoublingCube) game == Just side 
 performAction a@(PlayerAction aSide (Throw dice))    game@(Game { gameState = ToDouble side })          | aSide == side =
@@ -195,6 +202,57 @@ performActions actions game = foldl' (\eg a -> eg >>= performAction a) (Right ga
 success :: Game -> GameState -> GameAction -> Either InvalidAction Game
 success game state action =
   Right ((appendAction action . moveToState state) game)
+
+dieList :: Dice -> [Die]
+dieList (d1, d2) = 
+  if d1 == d2 then [d1, d1, d1, d1]
+              else [d1, d2]
+
+checkMovesLegal :: Side -> Board -> Dice -> [Move] -> Either InvalidDecisionType ()
+checkMovesLegal side board dice moves = do
+  _ <- checkUsesAllPossibleMoves side board dice moves
+  -- TODO: move other checks from `move` to here
+  return ()
+
+checkUsesAllPossibleMoves :: Side -> Board -> Dice -> [Move] -> Either InvalidDecisionType ()
+checkUsesAllPossibleMoves side board dice moves =
+  if length moves < maxNoOfMovesAvailable then Left MoreMovesPossible -- TODO: include all possible moves
+                                          else Right ()
+  where
+    maxNoOfMovesAvailable = case Set.elems (legalMoves side board dice) of
+      []     -> 0
+      (ms:_) -> length ms
+
+legalMoves :: Side -> Board -> Dice -> Set [Move]
+legalMoves side board dice = Set.fromList (legalMoves' board (dieList dice))
+  where
+    legalMoves' :: Board -> [Die] -> [[Move]]
+    legalMoves' _ [] = [[]]
+    legalMoves' b ds =
+      [m:ms | (d, ds') <- selectDie ds
+      ,       m        <- singleDieLegalMoves b d
+      ,       ms       <- legalMoves' (move' side b m d) ds'
+      ]
+    selectDie :: [Die] -> [(Die, [Die])]
+    selectDie [] = []
+    selectDie ds = [(h, t) | (h:t) <- permutations ds] -- TODO: inefficient
+    singleDieLegalMoves :: Board -> Die -> [Move]
+    singleDieLegalMoves b d = [m | m <- moves b d 1, isLegal b m]
+    moves :: Board -> Die -> Pos -> [Move]
+    moves _ _ 25 = []
+    moves b d i =
+      case pieces b i of
+        Just (s, n) -> if s == side then (Move i (i+d*(direction side))):nextMoves
+                                    else nextMoves
+        Nothing -> nextMoves
+      where nextMoves = moves b d (i+1)
+    -- TODO: use `move` once checks and extra args are removed
+    move' :: Side -> Board -> Move -> Die -> Board
+    move' s b m d = case move s (b, [d]) m of
+      Left _ -> error "should not happen; this branch will be removed (see TODO)"
+      Right (b', _) -> b'
+    isLegal :: Board -> Move -> Bool
+    isLegal _ _ = True -- TODO
 
 moveToState :: GameState -> Game -> Game
 moveToState state game = game { gameState = state }
