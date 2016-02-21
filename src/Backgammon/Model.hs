@@ -21,6 +21,7 @@ module Backgammon.Model
 )
 where
 
+import Control.Applicative ((<$>))
 import Control.Monad (foldM)
 import Data.List (foldl')
 import Data.Maybe (fromMaybe)
@@ -38,7 +39,7 @@ data Side = White | Black
 
 data Move = Move Pos Pos
           | Enter Pos
-          | TakeOff Pos
+          | BearOff Pos
   deriving (Eq, Show)
 
 data Game = Game { gameBoard :: Board
@@ -87,7 +88,10 @@ data GameState = PlayersToThrowInitial
 data InvalidDecisionType = MustEnterBeforeMoving
                          | MovePossible
                          | NoPieces Pos
-                         | MustMoveOwnPieces Side
+                         | MovedOpponentsPieces Side
+                         -- | incorrect move, available numbers of pips to move by
+                         | NoSuchNumberThrown Move [Die]
+                         | TooManyMoves
   deriving (Eq, Show)
 
 data InvalidAction = ActionInvalidForState GameState GameAction
@@ -114,12 +118,29 @@ opposite :: Side -> Side
 opposite White = Black
 opposite Black = White
 
-move :: Side -> Board -> Move -> Either InvalidDecisionType Board
-move side board (Move from to) = 
-  case pieces board from of
-    Just (s, _) -> if s == side then decPieces from board >>= incPieces to side 
-                                else Left (MustMoveOwnPieces side)
+distance :: Side -> Move -> Int
+distance side (Move from to) = (direction side) * (to - from)
+distance side (Enter to)     = (direction side) * (to - barIndex side)
+distance side (BearOff from) = (direction side) * (bearOffIndex side - from)
+
+move :: Side                                      -- ^ the side making the move
+     -> (Board, [Die])                            -- ^ the board and available dice
+     -> Move                                      -- ^ the move to make
+     -> Either InvalidDecisionType (Board, [Die]) -- ^ error, or board and remaining dice
+move side (board, dice) m@(Move from to) = do
+  remainingDice <- removeDie dice
+  updatedBoard <- case pieces board from of
+    Just (s, _) -> if s == side then decPieces from board >>= incPieces to side
+                                else Left (MovedOpponentsPieces side)
     Nothing     -> Left (NoPieces from) -- TODO: test this
+  return (updatedBoard, remainingDice)  
+  where
+    removeDie [] = Left TooManyMoves
+    removeDie ds = removeDie' ds []
+    removeDie' []     rejected = Left (NoSuchNumberThrown m (reverse rejected))
+    removeDie' (d:ds) rejected =
+      if d == distance side m then Right (reverse rejected ++ ds)
+                              else removeDie' ds (d:rejected)
 
 decPieces :: Pos -> Board -> Either InvalidDecisionType Board
 decPieces pos board@(Board b bw bb) =
@@ -146,13 +167,13 @@ performAction a@(InitialThrows white black)    game@(Game { gameState = PlayersT
                 else                   PlayersToThrowInitial) a
   where
     side = if white > black then White else Black
-performAction a@(PlayerAction aSide d@(Moves moves)) game@(Game { gameState = ToMove side _ })          | aSide == side =
+performAction a@(PlayerAction aSide d@(Moves moves)) game@(Game { gameState = ToMove side (d1, d2) })   | aSide == side =
   updatedBoard >>= \b ->
     success (game { gameBoard = b }) (nextState (opposite side)) a
   where
     -- TODO: verify that moves own pieces
     -- TODO: verify that moves by the right numbers
-    updatedBoard = first (InvalidPlayerDecision game d) (foldM (move side) (gameBoard game) moves)
+    updatedBoard = first (InvalidPlayerDecision game d) (fst <$> foldM (move side) (gameBoard game, [d1, d2]) moves)
     nextState = if not (ownsCube side) then ToDouble else ToThrow
     ownsCube side = (doublingCubeOwner . gameDoublingCube) game == Just side 
 performAction a@(PlayerAction aSide (Throw dice))    game@(Game { gameState = ToDouble side })          | aSide == side =
@@ -180,6 +201,17 @@ moveToState state game = game { gameState = state }
 
 appendAction :: GameAction -> Game -> Game
 appendAction action game = game { _gameActions = _gameActions game ++ [action] }
+
+direction :: Side -> Int
+direction White = -1
+direction Black = 1
+
+barIndex :: Side -> Int
+barIndex White = 25
+barIndex Black = 0
+
+bearOffIndex :: Side -> Int
+bearOffIndex = barIndex . opposite
 
 pipDists :: Side -> [Int]
 pipDists White = [1..24]

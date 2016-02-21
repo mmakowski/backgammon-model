@@ -40,15 +40,20 @@ unitTests = testGroup "Backgammon.Model unit tests"
   -- * moving
 
   , testCase "player cannot move opponent's pieces" $
-      let gameAfter21 = fromRight (performAction (InitialThrows 2 1) newGame)
-          badMove = Moves [Move 24 23, Move 1 3]
-      in performAction (PlayerAction White badMove) gameAfter21 @?=
-         Left (InvalidPlayerDecision gameAfter21 badMove (MustMoveOwnPieces White))
+      let whiteToMove21 = fromRight (performAction (InitialThrows 2 1) newGame)
+          badMove = Moves [Move 24 23, Move 12 10]
+      in performAction (PlayerAction White badMove) whiteToMove21 @?=
+         Left (InvalidPlayerDecision whiteToMove21 badMove (MovedOpponentsPieces White))
 
-  -- TODO: must move the correct number of pips (regular)
-  -- TODO; must move the correct number of pips (double)
+  , testCase "player must move by the thrown number of pips" $
+      let whiteToMove21 = fromRight (performAction (InitialThrows 2 1) newGame)
+          badMove = Moves [Move 24 23, Move 24 21]
+      in performAction (PlayerAction White badMove) whiteToMove21 @?=
+         Left (InvalidPlayerDecision whiteToMove21 badMove (NoSuchNumberThrown (Move 24 21) [2]))
+
   -- TODO: must move forward
   -- TODO: cannot move onto occupied point
+  -- TODO: must move the correct number of moves
 
   -- * doubling
 
