@@ -71,7 +71,7 @@ movingUnitTests = testGroup "moving"
   [ testCase "player cannot move opponent's pieces" $
       let badMove = Moves [Move 24 23, Move 12 10]
       in performAction (PlayerAction White badMove) whiteToMove21 @?=
-         Left (InvalidPlayerDecision whiteToMove21 badMove (MovedOpponentsPieces White))
+         Left (InvalidPlayerDecision whiteToMove21 badMove (MovedOpponentsPieces (Move 12 10)))
 
   , testCase "player must move by the thrown number of pips" $
       let badMove = Moves [Move 24 23, Move 24 21]

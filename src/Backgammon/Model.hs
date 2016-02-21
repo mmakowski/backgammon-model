@@ -23,8 +23,8 @@ module Backgammon.Model
 where
 
 import Control.Applicative ((<$>))
-import Control.Monad (foldM)
-import Data.List (foldl', permutations)
+import Control.Monad (foldM, foldM_)
+import Data.List (elemIndex, foldl', permutations)
 import Data.Maybe (fromMaybe)
 
 import Data.Set (Set)
@@ -92,7 +92,7 @@ data GameState = PlayersToThrowInitial
 data InvalidDecisionType = MustEnterBeforeMoving
                          | MoreMovesPossible
                          | NoPieces Pos
-                         | MovedOpponentsPieces Side
+                         | MovedOpponentsPieces Move
                          -- | incorrect move, available numbers of pips to move by
                          | NoSuchNumberThrown Move [Die]
                          | TooManyMoves
@@ -128,23 +128,13 @@ distance side (Enter to)     = direction side * (to - barIndex side)
 distance side (BearOff from) = direction side * (bearOffIndex side - from)
 
 move :: Side                                      -- ^ the side making the move
-     -> (Board, [Die])                            -- ^ the board and available dice
+     -> Board                                     -- ^ the board
      -> Move                                      -- ^ the move to make
-     -> Either InvalidDecisionType (Board, [Die]) -- ^ error, or board and remaining dice
-move side (board, dice) m@(Move from to) = do
-  remainingDice <- removeDie dice
-  updatedBoard <- case pieces board from of
-    Just (s, _) -> if s == side then decPieces from board >>= incPieces to side
-                                else Left (MovedOpponentsPieces side)
-    Nothing     -> Left (NoPieces from) -- TODO: test this
-  return (updatedBoard, remainingDice)  
-  where
-    removeDie [] = Left TooManyMoves
-    removeDie ds = removeDie' ds []
-    removeDie' []     rejected = Left (NoSuchNumberThrown m (reverse rejected))
-    removeDie' (d:ds) rejected =
-      if d == distance side m then Right (reverse rejected ++ ds)
-                              else removeDie' ds (d:rejected)
+     -> Either InvalidDecisionType Board          -- ^ error or board
+move side board m@(Move from to) =
+  case pieces board from of
+    Just (s, _) -> decPieces from board >>= incPieces to side
+    Nothing     -> Left (NoPieces from)
 
 decPieces :: Pos -> Board -> Either InvalidDecisionType Board
 decPieces pos board@(Board b bw bb) =
@@ -176,7 +166,7 @@ performAction a@(InitialThrows white black)          game@Game{ gameState = Play
     side = if white > black then White else Black
 performAction a@(PlayerAction aSide d@(Moves moves)) game@Game{ gameState = ToMove side dice }       | aSide == side = do
   _ <- wrapInInvalidDecision (checkMovesLegal side board dice moves)
-  updatedBoard <- wrapInInvalidDecision (fst <$> foldM (move side) (board, dieList dice) moves)
+  updatedBoard <- wrapInInvalidDecision (foldM (move side) board moves)
   success (game { gameBoard = updatedBoard }) (nextState (opposite side)) a
   where
     board = gameBoard game
@@ -210,9 +200,9 @@ dieList (d1, d2) =
 
 checkMovesLegal :: Side -> Board -> Dice -> [Move] -> Either InvalidDecisionType ()
 checkMovesLegal side board dice moves = do
-  _ <- checkUsesAllPossibleMoves side board dice moves
-  -- TODO: move other checks from `move` to here
-  return ()
+  checkUsesAllPossibleMoves side board dice moves
+  checkMovesByCorrectNumberOfPips side dice moves
+  checkMovesOwnPieces side board moves
 
 checkUsesAllPossibleMoves :: Side -> Board -> Dice -> [Move] -> Either InvalidDecisionType ()
 checkUsesAllPossibleMoves side board dice moves =
@@ -223,15 +213,40 @@ checkUsesAllPossibleMoves side board dice moves =
       []     -> 0
       (ms:_) -> length ms
 
-legalMoves :: Side -> Board -> Dice -> Set [Move]
-legalMoves side board dice = Set.fromList (legalMoves' board (dieList dice))
+checkMovesByCorrectNumberOfPips :: Side -> Dice -> [Move] -> Either InvalidDecisionType ()
+checkMovesByCorrectNumberOfPips side dice =
+  foldM_ checkAndRemoveDie (dieList dice)
   where
-    legalMoves' :: Board -> [Die] -> [[Move]]
+    checkAndRemoveDie [] _ = Left TooManyMoves
+    checkAndRemoveDie ds m =
+      case elemIndex (distance side m) ds of
+        Just i  -> Right (take i ds ++ drop (i+1) ds)
+        Nothing -> Left (NoSuchNumberThrown m ds)
+
+checkMovesOwnPieces :: Side -> Board -> [Move] -> Either InvalidDecisionType ()
+checkMovesOwnPieces side =
+  foldM_ checkAndMove
+  where
+    checkAndMove board m = do
+      check board m
+      move side board m
+    check board m =
+      let from = moveFrom side m
+      in
+        case pieces board from of
+          Just (s, n) -> if s == side then Right () else Left (MovedOpponentsPieces m)
+          Nothing     -> Left (NoPieces from)
+
+legalMoves :: Side -> Board -> Dice -> Set [Move]
+legalMoves side board dice = Set.fromList (legalMoves' (Right board) (dieList dice))
+  where
+    legalMoves' :: Either InvalidDecisionType Board -> [Die] -> [[Move]]
     legalMoves' _ [] = [[]]
-    legalMoves' b ds =
+    legalMoves' (Left _) _ = [[]]
+    legalMoves' (Right b) ds =
       [m:ms | (d, ds') <- selectDie ds
       ,       m        <- singleDieLegalMoves b d
-      ,       ms       <- legalMoves' (move' side b m d) ds'
+      ,       ms       <- legalMoves' (move side b m) ds'
       ]
     selectDie :: [Die] -> [(Die, [Die])]
     selectDie [] = []
@@ -246,11 +261,6 @@ legalMoves side board dice = Set.fromList (legalMoves' board (dieList dice))
                                     else nextMoves
         Nothing -> nextMoves
       where nextMoves = moves b d (i+1)
-    -- TODO: use `move` once checks and extra args are removed
-    move' :: Side -> Board -> Move -> Die -> Board
-    move' s b m d = case move s (b, [d]) m of
-      Left _ -> error "should not happen; this branch will be removed (see TODO)"
-      Right (b', _) -> b'
     isLegal :: Board -> Move -> Bool
     isLegal _ _ = True -- TODO
 
@@ -259,6 +269,11 @@ moveToState state game = game { gameState = state }
 
 appendAction :: GameAction -> Game -> Game
 appendAction action game = game { _gameActions = _gameActions game ++ [action] }
+
+moveFrom :: Side -> Move -> Pos
+moveFrom _ (Move from _) = from
+moveFrom _ (BearOff from) = from
+moveFrom s (Enter _) = barIndex s
 
 direction :: Side -> Int
 direction White = -1
