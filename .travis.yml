@@ -3,7 +3,8 @@ language: haskell
 ghc:
   - "7.8"
 
-install:
+before_install:
   - cabal install cabal-install-1.20.0.0
-  - cabal configure
+
+install:
   - cabal install --only-dependencies --enable-tests
