@@ -104,8 +104,12 @@ movingUnitTests = testGroup "moving"
       let whiteToMove51 = fromRight (performAction (InitialThrows 5 1) newGame)
           badMove = Moves [Move 24 23, Move 6 1]
       in performAction (PlayerAction White badMove) whiteToMove51 @?=
-         Left (InvalidPlayerDecision whiteToMove51 badMove (MovedOntoOpponentsClosedPoint (Move 6 1)))
+         Left (InvalidPlayerDecision whiteToMove51 badMove (MovedOntoOpponentsClosedPoint 1))
 
+  , testCase "player must enter from bar before moving" $
+      let badMove = Moves [Move 24 22, Move 6 5]
+      in performAction (PlayerAction White badMove) whiteToEnter21 @?=
+         Left (InvalidPlayerDecision whiteToEnter21 badMove MustEnterBeforeMoving)
   -- TODO: must enter before moving
   -- TODO: cannot bear off unless all remaining pieces are in the home board
   ]
@@ -163,6 +167,14 @@ doublingUnitTests = testGroup "doubling"
 gameAfterInitialWhite31 = fromRight $ performActions 
   [ InitialThrows 3 1
   , PlayerAction White (Moves [Move 8 5, Move 6 5])
+  ] newGame
+
+whiteToEnter21 = fromRight $ performActions
+  [ InitialThrows 2 1
+  , PlayerAction White (Moves [Move 24 23, Move 23 21])
+  , PlayerAction Black (Throw (4, 2))
+  , PlayerAction Black (Moves [Move 19 21, Move 17 21])
+  , PlayerAction White (Throw (2, 1))
   ] newGame
 
 whiteToMove21 = fromRight (performAction (InitialThrows 2 1) newGame)

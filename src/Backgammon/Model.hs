@@ -93,7 +93,7 @@ data InvalidDecisionType = MustEnterBeforeMoving
                          | MoreMovesPossible
                          | NoPieces Pos
                          | MovedOpponentsPieces Move
-                         | MovedOntoOpponentsClosedPoint Move
+                         | MovedOntoOpponentsClosedPoint Pos
                          -- | incorrect move, available numbers of pips to move by
                          | NoSuchNumberThrown Move [Die]
                          | TooManyMoves
@@ -134,11 +134,11 @@ move :: Side                                      -- ^ the side making the move
      -> Either InvalidDecisionType Board          -- ^ error or board
 move side board m@(Move from to) =
   case pieces board from of
-    Just (s, _) -> decPieces from board >>= incPieces to side
+    Just (s, _) -> takePiece from board >>= landPiece to side
     Nothing     -> Left (NoPieces from)
 
-decPieces :: Pos -> Board -> Either InvalidDecisionType Board
-decPieces pos board@(Board b bw bb) =
+takePiece :: Pos -> Board -> Either InvalidDecisionType Board
+takePiece pos board@(Board b bw bb) =
   case pieces board pos of
     Just (s, n) -> Right (Board (take (pos-1) b ++ [dec1 s n] ++ drop pos b) bw bb)
     Nothing     -> Left (NoPieces pos)
@@ -146,18 +146,30 @@ decPieces pos board@(Board b bw bb) =
     dec1 _ 1 = Nothing
     dec1 s n = Just (s, n-1)
 
-incPieces :: Pos -> Side -> Board -> Either InvalidDecisionType Board
-incPieces pos side board@(Board b bw bb) =
-  -- TODO: Left when owner of target is different from side
-  Right (Board (take (pos-1) b ++ [Just (side, updatedCount)] ++ drop pos b) bw bb)
+landPiece :: Pos -> Side -> Board -> Either InvalidDecisionType Board
+landPiece pos side board@(Board b bw bb) =
+  case pieces board pos of
+    Nothing                 -> Right (setField (Just (side, 1)))
+    Just (s, n) | s == side -> Right (setField (Just (side, n+1)))
+    Just (s, n) | n == 1    -> Right (incBar (opposite side) (setField (Just (side, 1))))
+    _                       -> Left (MovedOntoOpponentsClosedPoint pos)
   where
+    setField f = Board (take (pos-1) b ++ [f] ++ drop pos b) bw bb
     updatedCount =
       case pieces board pos of
         Just (_, n) -> n+1
         Nothing     -> 1
 
+incBar :: Side -> Board -> Board
+incBar White (Board b bw bb) = Board b (bw+1) bb
+incBar Black (Board b bw bb) = Board b bw     (bb+1)
+
 pieces :: Board -> Pos -> Maybe (Side, Int)
 pieces (Board board _ _) pos = board !! (pos-1)
+
+barPieces :: Side -> Board -> Int
+barPieces White (Board _ bw _ ) = bw
+barPieces Black (Board _ _  bb) = bb
 
 pointOwner :: Board -> Pos -> Maybe Side
 pointOwner board pos =
@@ -209,8 +221,9 @@ checkMovesLegal :: Side -> Board -> Dice -> [Move] -> Either InvalidDecisionType
 checkMovesLegal side board dice moves = do
   checkUsesAllPossibleMoves side board dice moves
   checkMovesByCorrectNumberOfPips side dice moves
-  checkMovesOwnPieces side board moves
+  checkEntersBeforeMoving side board moves
   checkMovesOntoAllowedPoints side board moves
+  checkMovesOwnPieces side board moves
 
 checkUsesAllPossibleMoves :: Side -> Board -> Dice -> [Move] -> Either InvalidDecisionType ()
 checkUsesAllPossibleMoves side board dice moves =
@@ -231,6 +244,26 @@ checkMovesByCorrectNumberOfPips side dice =
         Just i  -> Right (take i ds ++ drop (i+1) ds)
         Nothing -> Left (NoSuchNumberThrown m ds)
 
+checkEntersBeforeMoving :: Side -> Board -> [Move] -> Either InvalidDecisionType ()
+checkEntersBeforeMoving side =
+  foldM_ checkAndMove
+  where
+    checkAndMove board m = do
+      check board m
+      move side board m
+    check board (Move _ _) | barPieces side board > 0 = Left MustEnterBeforeMoving
+    check board _                                     = Right ()
+
+checkMovesOntoAllowedPoints :: Side -> Board -> [Move] -> Either InvalidDecisionType ()
+checkMovesOntoAllowedPoints side board moves =
+  forM_ moves check
+  where
+    check m =
+      let pos = moveTo side m
+      in
+        if pointOwner board pos == Just (opposite side) then Left (MovedOntoOpponentsClosedPoint pos)
+                                                        else Right ()
+
 checkMovesOwnPieces :: Side -> Board -> [Move] -> Either InvalidDecisionType ()
 checkMovesOwnPieces side =
   foldM_ checkAndMove
@@ -244,14 +277,6 @@ checkMovesOwnPieces side =
         case pieces board from of
           Just (s, n) -> if s == side then Right () else Left (MovedOpponentsPieces m)
           Nothing     -> Left (NoPieces from)
-
-checkMovesOntoAllowedPoints :: Side -> Board -> [Move] -> Either InvalidDecisionType ()
-checkMovesOntoAllowedPoints side board moves =
-  forM_ moves check
-  where
-    check m =
-      if pointOwner board (moveTo side m) == Just (opposite side) then Left (MovedOntoOpponentsClosedPoint m)
-                                                                  else Right ()
 
 legalMoves :: Side -> Board -> Dice -> Set [Move]
 legalMoves side board dice = Set.fromList (legalMoves' (Right board) (dieList dice))
