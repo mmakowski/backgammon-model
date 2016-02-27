@@ -251,6 +251,7 @@ checkMovesOntoAllowedPoints side board moves =
   where
     check m =
       if pointOwner board (moveTo side m) == Just (opposite side) then Left (MovedOntoOpponentsClosedPoint m)
+                                                                  else Right ()
 
 legalMoves :: Side -> Board -> Dice -> Set [Move]
 legalMoves side board dice = Set.fromList (legalMoves' (Right board) (dieList dice))
