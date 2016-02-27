@@ -23,7 +23,7 @@ module Backgammon.Model
 where
 
 import Control.Applicative ((<$>))
-import Control.Monad (foldM, foldM_)
+import Control.Monad (foldM, foldM_, forM_)
 import Data.List (elemIndex, foldl', permutations)
 import Data.Maybe (fromMaybe)
 
@@ -93,6 +93,7 @@ data InvalidDecisionType = MustEnterBeforeMoving
                          | MoreMovesPossible
                          | NoPieces Pos
                          | MovedOpponentsPieces Move
+                         | MovedOntoOpponentsClosedPoint Move
                          -- | incorrect move, available numbers of pips to move by
                          | NoSuchNumberThrown Move [Die]
                          | TooManyMoves
@@ -158,6 +159,12 @@ incPieces pos side board@(Board b bw bb) =
 pieces :: Board -> Pos -> Maybe (Side, Int)
 pieces (Board board _ _) pos = board !! (pos-1)
 
+pointOwner :: Board -> Pos -> Maybe Side
+pointOwner board pos =
+  case pieces board pos of
+    Just (s, n) | n > 1 -> Just s
+    _                   -> Nothing
+
 performAction :: GameAction -> Game -> Either InvalidAction Game
 performAction a@(InitialThrows white black)          game@Game{ gameState = PlayersToThrowInitial } =
   success game (if white /= black then ToMove side (normDice (white, black))
@@ -203,6 +210,7 @@ checkMovesLegal side board dice moves = do
   checkUsesAllPossibleMoves side board dice moves
   checkMovesByCorrectNumberOfPips side dice moves
   checkMovesOwnPieces side board moves
+  checkMovesOntoAllowedPoints side board moves
 
 checkUsesAllPossibleMoves :: Side -> Board -> Dice -> [Move] -> Either InvalidDecisionType ()
 checkUsesAllPossibleMoves side board dice moves =
@@ -236,6 +244,13 @@ checkMovesOwnPieces side =
         case pieces board from of
           Just (s, n) -> if s == side then Right () else Left (MovedOpponentsPieces m)
           Nothing     -> Left (NoPieces from)
+
+checkMovesOntoAllowedPoints :: Side -> Board -> [Move] -> Either InvalidDecisionType ()
+checkMovesOntoAllowedPoints side board moves =
+  forM_ moves check
+  where
+    check m =
+      if pointOwner board (moveTo side m) == Just (opposite side) then Left (MovedOntoOpponentsClosedPoint m)
 
 legalMoves :: Side -> Board -> Dice -> Set [Move]
 legalMoves side board dice = Set.fromList (legalMoves' (Right board) (dieList dice))
@@ -274,6 +289,11 @@ moveFrom :: Side -> Move -> Pos
 moveFrom _ (Move from _) = from
 moveFrom _ (BearOff from) = from
 moveFrom s (Enter _) = barIndex s
+
+moveTo :: Side -> Move -> Pos
+moveTo _ (Move _ to) = to
+moveTo s (BearOff _) = bearOffIndex s
+moveTo _ (Enter to) = to
 
 direction :: Side -> Int
 direction White = -1

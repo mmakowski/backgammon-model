@@ -83,7 +83,12 @@ movingUnitTests = testGroup "moving"
       in performAction (PlayerAction White badMove) whiteToMove21 @?=
          Left (InvalidPlayerDecision whiteToMove21 badMove MoreMovesPossible)
 
-  -- TODO: cannot move onto occupied point
+  , testCase "player cannot move onto a point with two or more of opponent's pieces" $
+      let whiteToMove51 = fromRight (performAction (InitialThrows 5 1) newGame)
+          badMove = Moves [Move 24 23, Move 6 1]
+      in performAction (PlayerAction White badMove) whiteToMove51 @?=
+         Left (InvalidPlayerDecision whiteToMove51 badMove (MovedOntoOpponentsClosedPoint (Move 6 1)))
+
   -- TODO: must move the correct number of moves
   ]
 
