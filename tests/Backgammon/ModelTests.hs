@@ -83,13 +83,31 @@ movingUnitTests = testGroup "moving"
       in performAction (PlayerAction White badMove) whiteToMove21 @?=
          Left (InvalidPlayerDecision whiteToMove21 badMove MoreMovesPossible)
 
+  , testCase "player cannot make more than two moves when no double is rolled" $
+      let badMove = Moves [Move 24 23, Move 23 21, Move 21 20]
+      in performAction (PlayerAction White badMove) whiteToMove21 @?=
+         Left (InvalidPlayerDecision whiteToMove21 badMove TooManyMoves)
+
+  , testCase "player must make four moves when a double is rolled and not blocked" $
+      let blackToMove11 = fromRight (performAction (PlayerAction Black (Throw (1, 1))) gameAfterInitialWhite31)
+          badMove = Moves [Move 1 2, Move 1 2, Move 2 3]
+      in performAction (PlayerAction Black badMove) blackToMove11 @?=
+         Left (InvalidPlayerDecision blackToMove11 badMove MoreMovesPossible)
+
+  , testCase "player cannot make more than four moves when a double is rolled" $
+      let blackToMove11 = fromRight (performAction (PlayerAction Black (Throw (1, 1))) gameAfterInitialWhite31)
+          badMove = Moves [Move 1 2, Move 1 2, Move 2 3, Move 2 3, Move 3 4]
+      in performAction (PlayerAction Black badMove) blackToMove11 @?=
+         Left (InvalidPlayerDecision blackToMove11 badMove TooManyMoves)
+
   , testCase "player cannot move onto a point with two or more of opponent's pieces" $
       let whiteToMove51 = fromRight (performAction (InitialThrows 5 1) newGame)
           badMove = Moves [Move 24 23, Move 6 1]
       in performAction (PlayerAction White badMove) whiteToMove51 @?=
          Left (InvalidPlayerDecision whiteToMove51 badMove (MovedOntoOpponentsClosedPoint (Move 6 1)))
 
-  -- TODO: must move the correct number of moves
+  -- TODO: must enter before moving
+  -- TODO: cannot bear off unless all remaining pieces are in the home board
   ]
 
 doublingUnitTests :: TestTree
